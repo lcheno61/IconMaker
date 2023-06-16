@@ -68,20 +68,6 @@ extension ContentView {
                     outputFileName.append("__nil__")
                 }
             }
-            
-            
-            
-//            var fileArray = [Int]()
-//            let sizeSet = Array(Set(sizeArray))
-//            for size in sizeSet {
-//                let targetSize = CGSizeMake(size, size)
-//                if let resizedImage = image.resized(to: targetSize) {
-////                    imageArray.append(resizedImage)
-//                    let fileName = "/\(Int(size)).png"
-//                    resizedImage.writePNG(toURL: URL(fileURLWithPath: outputPath + fileName))
-//                    fileArray.append(Int(size))
-//                }
-//            }
             createJSON(outputPath, outputFileName, platforms)
             isUIDisable = false
             dataLock = NSLock()

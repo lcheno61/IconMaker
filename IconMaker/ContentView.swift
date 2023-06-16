@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var inputPath = "Click or drag image file here."
     @State private var outputPath = ""
     @State private var imageStatus = "plus.circle.fill"
+    @State private var previewImage = "photo"
     @State private var imageStatusColor: Color = .gray
     @State private var platform = 0
 
@@ -20,7 +21,7 @@ struct ContentView: View {
         VStack {
 //            Spacer().frame(height: 5)
             Group {
-                AsyncImage(url: URL(string: inputPath)) { image in
+                AsyncImage(url: URL(string: previewImage)) { image in
                     ZStack(alignment: .bottomTrailing) {
                         image
                             .resizable()
@@ -53,19 +54,21 @@ struct ContentView: View {
                     if let provider = providers.first(where: { $0.canLoadObject(ofClass: URL.self) } ) {
                         let _ = provider.loadObject(ofClass: URL.self) { object, error in
                             if let url = object {
-                                let imageExtensions = ["png", "jpg", "gif"]
+                                let imageExtensions = ["png", "jpg", "gif", "jpeg"]
                                 let pathExtention = url.pathExtension
                                 if imageExtensions.contains(pathExtention) {
-                                    inputPath = "\(url)"
+                                    inputPath = pathChecker("\(url)")
                                     imageStatus = "checkmark.circle.fill"
                                     imageStatusColor = .clear
+                                    previewImage = "\(url)"
+                                    let filePath = url.deletingLastPathComponent()
+                                    outputPath = pathChecker("\(filePath)").replacingOccurrences(of: "file://", with: "")
                                 } else {
                                     inputPath = "Unsupported content type, please choose again."
                                     imageStatus = "x.circle.fill"
                                     imageStatusColor = .red
 
                                 }
-                                
                             }
                         }
                         return true
@@ -163,14 +166,20 @@ struct ContentView: View {
         let okButtonPressed = openPanel.runModal() == .OK
         if okButtonPressed {
             // Update the path text field
-            let path = openPanel.url?.path
-            
-            imageStatusColor = .clear
-            if sender == "$inputPath" {
-                inputPath = "file://" + path!
-                imageStatus = "checkmark.circle.fill"
-            } else if sender == "$outputPath" {
-                outputPath = path!
+            if let path = openPanel.url?.path {
+                imageStatusColor = .clear
+                if sender == "$inputPath" {
+                    inputPath = "file://" + path
+                    let addPercentInputPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+                    previewImage = "file://" + addPercentInputPath
+                    imageStatus = "checkmark.circle.fill"
+                    if outputPath == "" {
+                        let filePath = URL(fileURLWithPath: path).deletingLastPathComponent()
+                        outputPath = pathChecker("\(filePath)").replacingOccurrences(of: "file://", with: "")
+                    }
+                } else if sender == "$outputPath" {
+                    outputPath = pathChecker(path)
+                }
             }
         }
     }
@@ -199,29 +208,26 @@ struct ContentView: View {
             return
         }
         let input = inputPath.replacingOccurrences(of: "file://", with: "")
-        let nameOfFile = input.components(separatedBy: "/").last ?? "zipFile"
+        let nameOfFile = URL(fileURLWithPath: input, isDirectory: false).deletingPathExtension().lastPathComponent
         let outputFolder = createDirectory(nameOfFile)
-//        print(input)
+
         if viewModel.generate(input, outputFolder, platform) {
             imageStatusColor = .green
         } else {
             imageStatusColor = .red
+            imageStatus = "x.circle.fill"
             showAlert(with: .warning, title: "Error", subtitle: errorMessage)
         }
     }
     
     func createDirectory(_ name: String) -> String {
-        let docURL = URL(string: outputPath)!
-        let imageExtensions = [".png", ".jpg", ".gif"]
-        var fileName = name
-        for ext in imageExtensions {
-            fileName = fileName.replacingOccurrences(of: ext, with: "")
-        }
-        var dataPath = docURL.appendingPathComponent("AppIcon_\(fileName).appiconset")
+        
+        let docURL = URL(fileURLWithPath: outputPath, isDirectory: true)
+        var dataPath = docURL.appendingPathComponent("AppIcon_\(name).appiconset")
         var count = 0
         while FileManager.default.fileExists(atPath: dataPath.path) {
             count += 1
-            dataPath = docURL.appendingPathComponent("AppIcon_\(fileName)_\(count).appiconset")
+            dataPath = docURL.appendingPathComponent("AppIcon_\(name)_\(count).appiconset")
         }
         do {
             try FileManager.default.createDirectory(atPath: dataPath.path, withIntermediateDirectories: true, attributes: nil)
@@ -230,6 +236,13 @@ struct ContentView: View {
             print(error.localizedDescription)
             return outputPath
         }
+    }
+    
+    func pathChecker(_ path: String) -> String {
+        var checkedPath = path.replacingOccurrences(of: " ", with: "\\ ")
+//        checkedPath = checkedPath.replacingOccurrences(of: "file://", with: "")
+        checkedPath = checkedPath.removingPercentEncoding ?? checkedPath
+        return checkedPath
     }
 }
 
